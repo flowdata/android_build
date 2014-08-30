@@ -834,6 +834,9 @@ $(TARGET_PREBUILT_KERNEL): $(TARGET_KERNEL_CONFIGURE)
 		DTS_BOARD=`echo $$dtsplat | cut -d':' -f2`; \
 		install -D kernel_imx/arch/arm/boot/dts/$$DTS_BOARD $(PRODUCT_OUT)/$$DTS_BOARD; \
 	done
+	mkdir -p $(PRODUCT_OUT)/boot/boot
+	install -D $(KERNEL_UIMAGE)  $(PRODUCT_OUT)/boot/boot/uImage
+
 else
 kernelimage:
 endif

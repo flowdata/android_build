@@ -974,6 +974,7 @@ $(TARGET_KERNEL_CONFIGURE): kernel_imx/arch/arm/configs/$(TARGET_KERNEL_DEFCONF)
 	install -D $(KERNEL_CONFIGURE) $(TARGET_KERNEL_CONFIGURE)
 
 $(TARGET_PREBUILT_KERNEL): $(TARGET_KERNEL_CONFIGURE)
+	mkdir -p $(PRODUCT_OUT)/boot/boot
 	$(MAKE) -C kernel_imx -j$(HOST_PROCESSOR) uImage $(KERNEL_ENV)
 	$(MAKE) -C kernel_imx dtbs $(KERNEL_ENV)
 	install -D $(KERNEL_ZIMAGE)  $(PRODUCT_OUT)/kernel
@@ -981,9 +982,9 @@ $(TARGET_PREBUILT_KERNEL): $(TARGET_KERNEL_CONFIGURE)
 		DTS_PLATFORM=`echo $$dtsplat | cut -d':' -f1`; \
 		DTS_BOARD=`echo $$dtsplat | cut -d':' -f2`; \
 		install -D kernel_imx/arch/arm/boot/dts/$$DTS_BOARD $(PRODUCT_OUT)/$$DTS_BOARD; \
+		install -D kernel_imx/arch/arm/boot/dts/$$DTS_BOARD $(PRODUCT_OUT)/boot/boot/$$DTS_BOARD; \
 	done
-	mkdir -p $(PRODUCT_OUT)/boot/boot
-	install -D $(KERNEL_UIMAGE)  $(PRODUCT_OUT)/boot/boot/uImage
+	install -D kernel_imx/arch/arm/boot/uImage $(PRODUCT_OUT)/boot/boot/
 
 else
 kernelimage:

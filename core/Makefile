@@ -873,7 +873,7 @@ endif
 # support ubifs rules:
 .PHONY: ubiimagesgenerate
 ifeq ($(TARGET_USERIMAGES_USE_UBIFS),true)
-UBI_RAW_IMAGE := $(PRODUCT_OUT)/android_root.img
+UBI_RAW_IMAGE := $(PRODUCT_OUT)/android.ubi
 
 .PHONY: $(UBI_RAW_IMAGE)
 

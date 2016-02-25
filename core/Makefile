@@ -1372,12 +1372,21 @@ endif
 	$(hide) $(foreach t,$(INSTALLED_RADIOIMAGE_TARGET),\
 	            mkdir -p $(zip_root)/RADIO; \
 	            $(ACP) $(t) $(zip_root)/RADIO/$(notdir $(t));)
+	$(hide) mkdir -p $(zip_root)/BOOT_EXTRA/boot
+	$(hide) for dtsplatform in $(TARGET_BOARD_DTS_CONFIG); do \
+		DTS_BOARD=`echo $$dtsplatform | cut -d':' -f2`; \
+		$(ACP) "$(PRODUCT_OUT)/$$DTS_BOARD" $(zip_root)/BOOT_EXTRA/boot; \
+		$(ACP) "$(BOOTSCRIPT_TARGET)" $(zip_root)/BOOT_EXTRA/boot; \
+	done
 	@# Contents of the system image
 	$(hide) $(call package_files-copy-root, \
 		$(SYSTEMIMAGE_SOURCE_DIR),$(zip_root)/SYSTEM)
 	@# Contents of the data image
 	$(hide) $(call package_files-copy-root, \
 		$(TARGET_OUT_DATA),$(zip_root)/DATA)
+	@# Contents of the debian image
+	$(hide) $(call package_files-copy-root, \
+		$(TARGET_OUT_DEBIAN),$(zip_root)/DEBIAN)
 ifdef BOARD_VENDORIMAGE_FILE_SYSTEM_TYPE
 	@# Contents of the vendor image
 	$(hide) $(call package_files-copy-root, \
@@ -1447,6 +1456,7 @@ $(INTERNAL_OTA_PACKAGE_TARGET): KEY_CERT_PAIR := $(DEFAULT_KEY_CERT_PAIR)
 $(INTERNAL_OTA_PACKAGE_TARGET): $(BUILT_TARGET_FILES_PACKAGE) $(DISTTOOLS)
 	@echo "Package OTA: $@"
 	$(hide) ./build/tools/releasetools/ota_from_target_files -v \
+			--no_prereq \
 			-p $(HOST_OUT) \
 			-k $(KEY_CERT_PAIR) \
 			$(BUILT_TARGET_FILES_PACKAGE) $@

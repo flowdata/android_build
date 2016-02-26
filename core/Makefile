@@ -835,6 +835,10 @@ $(TARGET_PREBUILT_KERNEL): $(TARGET_KERNEL_CONFIGURE)
 		install -D kernel_imx/arch/arm/boot/dts/$$DTS_BOARD $(PRODUCT_OUT)/boot/boot/$$DTS_BOARD; \
 	done
 	install -D kernel_imx/arch/arm/boot/uImage $(PRODUCT_OUT)/boot/boot/
+	install -D kernel_imx/arch/arm/boot/uImage $(TARGET_PREBUILT_KERNEL)
+	
+$(PRODUCT_OUT)/boot/boot/uImage: $(TARGET_PREBUILT_KERNEL)
+	install -D $(TARGET_PREBUILT_KERNEL) $(PRODUCT_OUT)/boot/boot/uImage
 
 else
 kernelimage:

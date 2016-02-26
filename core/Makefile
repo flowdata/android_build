@@ -1382,12 +1382,12 @@ endif
 		DTS_BOARD=`echo $$dtsplatform | cut -d':' -f2`; \
 		$(ACP) "$(PRODUCT_OUT)/$$DTS_BOARD" $(zip_root)/BOOT_PARTITION/boot; \
 		$(ACP) "$(PRODUCT_OUT)/$$DTS_BOARD" $(zip_root)/RECOVERY_PARTITION/boot; \
-	done \
-	$(hide) $(ACP) "$(BOOTSCRIPT_TARGET)" $(zip_root)/BOOT_PARTITION/boot; \
-	$(hide) $(ACP) "$(PRODUCT_OUT)/boot/boot/uramdisk.img" $(zip_root)/BOOT_PARTITION/boot; \
-	$(hide) $(ACP) "$(PRODUCT_OUT)/uramdisk-recovery.img" $(zip_root)/RECOVERY_PARTITION; \
-	$(hide) $(ACP) "$(PRODUCT_OUT)/boot/boot/uImage" $(zip_root)/BOOT_PARTITION/boot; \
-	$(hide) $(ACP) "$(PRODUCT_OUT)/boot/boot/uImage" $(zip_root)/RECOVERY_PARTITION; 
+	done 
+	$(hide) $(ACP) "$(BOOTSCRIPT_TARGET)" $(zip_root)/BOOT_PARTITION/boot 
+	$(hide) $(ACP) "$(PRODUCT_OUT)/boot/boot/uramdisk.img" $(zip_root)/BOOT_PARTITION/boot 
+	$(hide) $(ACP) "$(PRODUCT_OUT)/uramdisk-recovery.img" $(zip_root)/RECOVERY_PARTITION 
+	$(hide) $(ACP) "$(PRODUCT_OUT)/boot/boot/uImage" $(zip_root)/BOOT_PARTITION/boot 
+	$(hide) $(ACP) "$(PRODUCT_OUT)/boot/boot/uImage" $(zip_root)/RECOVERY_PARTITION 
 
 	@# Contents of the system image
 	$(hide) $(call package_files-copy-root, \

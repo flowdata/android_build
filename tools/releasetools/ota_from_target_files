@@ -455,8 +455,8 @@ def WriteFullOTAPackage(input_zip, output_zip):
   #       set up system to update recovery partition on first boot
   #    complete script normally (allow recovery to mark itself finished and reboot)
 
-  recovery_img = common.GetBootableImage("recovery.img", "recovery.img",
-                                         OPTIONS.input_tmp, "RECOVERY")
+  #recovery_img = common.GetBootableImage("recovery.img", "recovery.img",
+  #                                       OPTIONS.input_tmp, "RECOVERY")
   if OPTIONS.two_step:
     if not OPTIONS.info_dict.get("multistage_support", None):
       assert False, "two-step packages not supported by this build"
@@ -464,11 +464,11 @@ def WriteFullOTAPackage(input_zip, output_zip):
     assert fs.fs_type.upper() == "EMMC", \
         "two-step packages only supported on devices with EMMC /misc partitions"
     bcb_dev = {"bcb_dev": fs.device}
-    common.ZipWriteStr(output_zip, "recovery.img", recovery_img.data)
+    #common.ZipWriteStr(output_zip, "recovery.img", recovery_img.data)
     script.AppendExtra("""
 if get_stage("%(bcb_dev)s", "stage") == "2/3" then
 """ % bcb_dev)
-    script.WriteRawImage("/recovery", "recovery.img")
+    #script.WriteRawImage("/recovery", "recovery.img")
     script.AppendExtra("""
 set_stage("%(bcb_dev)s", "3/3");
 reboot_now("%(bcb_dev)s", "recovery");
@@ -487,25 +487,25 @@ else if get_stage("%(bcb_dev)s", "stage") == "3/3" then
 
   script.FormatPartition("/system")
   script.Mount("/system")
-  script.UnpackPackageDir("recovery", "/system")
+  #script.UnpackPackageDir("recovery", "/system")
   script.UnpackPackageDir("system", "/system")
 
   symlinks = CopySystemFiles(input_zip, output_zip)
   script.MakeSymlinks(symlinks)
 
-  boot_img = common.GetBootableImage("boot.img", "boot.img",
-                                     OPTIONS.input_tmp, "BOOT")
-  MakeRecoveryPatch(OPTIONS.input_tmp, output_zip, recovery_img, boot_img)
+  #boot_img = common.GetBootableImage("boot.img", "boot.img",
+  #                                   OPTIONS.input_tmp, "BOOT")
+  #MakeRecoveryPatch(OPTIONS.input_tmp, output_zip, recovery_img, boot_img)
 
   Item.GetMetadata(input_zip)
   Item.Get("system").SetPermissions(script)
 
-  common.CheckSize(boot_img.data, "boot.img", OPTIONS.info_dict)
-  common.ZipWriteStr(output_zip, "boot.img", boot_img.data)
-  script.ShowProgress(0.2, 0)
+  #common.CheckSize(boot_img.data, "boot.img", OPTIONS.info_dict)
+  #common.ZipWriteStr(output_zip, "boot.img", boot_img.data)
+  #script.ShowProgress(0.2, 0)
 
-  script.ShowProgress(0.2, 10)
-  script.WriteRawImage("/boot", "boot.img")
+  #script.ShowProgress(0.2, 10)
+  #script.WriteRawImage("/boot", "boot.img")
 
   script.ShowProgress(0.1, 0)
   device_specific.FullOTA_InstallEnd()

@@ -1319,6 +1319,10 @@ $(BUILT_TARGET_FILES_PACKAGE): \
 		$(built_ota_tools) \
 		$(APKCERTS_FILE) \
 		$(HOST_OUT_EXECUTABLES)/fs_config \
+		$(PRODUCT_OUT)/boot/boot/uramdisk.img \
+		$(PRODUCT_OUT)/uramdisk-recovery.img \
+		$(PRODUCT_OUT)/boot/boot/uImage \
+		$(BOOTSCRIPT_TARGET) \
 		| $(ACP)
 	@echo "Package target files: $@"
 	$(hide) rm -rf $@ $(zip_root)
@@ -1372,12 +1376,18 @@ endif
 	$(hide) $(foreach t,$(INSTALLED_RADIOIMAGE_TARGET),\
 	            mkdir -p $(zip_root)/RADIO; \
 	            $(ACP) $(t) $(zip_root)/RADIO/$(notdir $(t));)
-	$(hide) mkdir -p $(zip_root)/BOOT_EXTRA/boot
+	$(hide) mkdir -p $(zip_root)/BOOT_PARTITION/boot
+	$(hide) mkdir -p $(zip_root)/RECOVERY_PARTITION/boot
 	$(hide) for dtsplatform in $(TARGET_BOARD_DTS_CONFIG); do \
 		DTS_BOARD=`echo $$dtsplatform | cut -d':' -f2`; \
-		$(ACP) "$(PRODUCT_OUT)/$$DTS_BOARD" $(zip_root)/BOOT_EXTRA/boot; \
-		$(ACP) "$(BOOTSCRIPT_TARGET)" $(zip_root)/BOOT_EXTRA/boot; \
+		$(ACP) "$(PRODUCT_OUT)/$$DTS_BOARD" $(zip_root)/BOOT_PARTITION/boot; \
+		$(ACP) "$(PRODUCT_OUT)/$$DTS_BOARD" $(zip_root)/RECOVERY_PARTITION/boot; \
 	done
+	$(hide) $(ACP) "$(BOOTSCRIPT_TARGET)" $(zip_root)/BOOT_PARTITION/boot; \
+	$(hide) $(ACP) "$(PRODUCT_OUT)/boot/boot/uramdisk.img" $(zip_root)/BOOT_PARTITION/boot; \
+	$(hide) $(ACP) "$(PRODUCT_OUT)/uramdisk-recovery.img" $(zip_root)/RECOVERY_PARTITION; \
+	$(hide) $(ACP) "$(PRODUCT_OUT)/boot/boot/uImage" $(zip_root)/BOOT_PARTITION/boot; \
+	$(hide) $(ACP) "$(PRODUCT_OUT)/boot/boot/uImage" $(zip_root)/RECOVERY_PARTITION; \
 	@# Contents of the system image
 	$(hide) $(call package_files-copy-root, \
 		$(SYSTEMIMAGE_SOURCE_DIR),$(zip_root)/SYSTEM)

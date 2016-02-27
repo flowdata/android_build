@@ -11,7 +11,7 @@ def genLine(base, path, pointer=None):
     subname = fullname[bl:]
     mode = stat.S_IMODE(stats.st_mode)
     realmode = (((7<<6&mode)>>6)*100) + (((7<<3&mode)>>3)*10) + (7&mode)
-    print("%s %s %s %s %s" % (subname, stats.st_uid, stats.st_gid, realmode, "selabel=u:object_r:unlabeled:s0 capabilities=0x0"))
+    print("%s %s %s %s %s" % (subname, stats.st_uid, stats.st_gid, realmode, "selabel=u:object_r:system_file:s0 capabilities=0x0"))
 
 def genMetaFile(base, directory):
     genLine(base, os.path.join(base, directory))

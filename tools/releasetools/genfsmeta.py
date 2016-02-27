@@ -2,8 +2,10 @@
 import os
 import stat
 
-def genLine(base, path, pointer):
-    fullname = os.path.join(path,pointer)
+def genLine(base, path, pointer=None):
+    fullname = path
+    if pointer:
+        fullname = os.path.join(path,pointer)
     stats = os.stat(fullname)
     bl = len(base)+1
     subname = fullname[bl:]
@@ -12,7 +14,7 @@ def genLine(base, path, pointer):
     print("%s %s %s %s %s" % (subname, stats.st_uid, stats.st_gid, realmode, "selabel=u:object_r:unlabeled:s0 capabilities=0x0"))
 
 def genMetaFile(base, directory):
-    genLine(base, os.path.join(base, directory), "")
+    genLine(base, os.path.join(base, directory))
     for root, dirs, files in os.walk(os.path.join(base, directory)):
         for directory in dirs:
             genLine(base, root, directory)

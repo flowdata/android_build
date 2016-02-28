@@ -6,12 +6,15 @@ def genLine(base, path, pointer=None):
     fullname = path
     if pointer:
         fullname = os.path.join(path,pointer)
-    stats = os.stat(fullname)
-    bl = len(base)+1
-    subname = fullname[bl:]
-    mode = stat.S_IMODE(stats.st_mode)
-    realmode = (((7<<6&mode)>>6)*100) + (((7<<3&mode)>>3)*10) + (7&mode)
-    print("%s %s %s %s %s" % (subname, stats.st_uid, stats.st_gid, realmode, "selabel=u:object_r:system_file:s0 capabilities=0x0"))
+    try:
+        stats = os.stat(fullname)
+        bl = len(base)+1
+        subname = fullname[bl:]
+        mode = stat.S_IMODE(stats.st_mode)
+        realmode = (((7<<6&mode)>>6)*100) + (((7<<3&mode)>>3)*10) + (7&mode)
+        print("%s %s %s %s %s" % (subname, stats.st_uid, stats.st_gid, realmode, "selabel=u:object_r:system_file:s0 capabilities=0x0"))
+    except OSError:
+        pass # Ignore symlinks that can't be stat-ed.
 
 def genMetaFile(base, directory):
     genLine(base, os.path.join(base, directory))
@@ -20,7 +23,7 @@ def genMetaFile(base, directory):
             genLine(base, root, directory)
         for filename in files:
             genLine(base, root, filename)
-    
+
 if __name__ == "__main__":
     import sys
     if len(sys.argv) >= 3:

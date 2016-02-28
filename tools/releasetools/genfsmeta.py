@@ -7,6 +7,10 @@ def genLine(base, path, pointer=None):
     if pointer:
         fullname = os.path.join(path,pointer)
     try:
+        # Google's tools are really fragile about filenames, so filter anything with ISO8859-1 chars.
+        for char in fullname:
+            if ord(char) > 127:
+                return
         stats = os.stat(fullname)
         bl = len(base)+1
         subname = fullname[bl:]

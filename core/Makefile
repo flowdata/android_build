@@ -732,7 +732,7 @@ $(INSTALLED_RECOVERYIMAGE_TARGET): $(MKBOOTFS) $(MKBOOTIMG) $(MINIGZIP) \
 		$(INSTALLED_2NDBOOTLOADER_TARGET) \
 		$(recovery_build_prop) $(recovery_resource_deps) \
 		$(recovery_fstab) \
-		$(TARGET_OUT_EXECUTABLES)/bin/busybox \
+		$(TARGET_OUT_EXECUTABLES)/busybox \
 		$(RECOVERY_INSTALL_OTA_KEYS)
 	@echo ----- Making recovery image ------
 	$(hide) rm -rf $(TARGET_RECOVERY_OUT)
@@ -751,7 +751,7 @@ $(INSTALLED_RECOVERYIMAGE_TARGET): $(MKBOOTFS) $(MKBOOTIMG) $(MINIGZIP) \
 	  cp -rf $(item) $(TARGET_RECOVERY_ROOT_OUT)/)
 	$(hide) $(foreach item,$(recovery_fstab), \
 	  cp -f $(item) $(TARGET_RECOVERY_ROOT_OUT)/etc/recovery.fstab)
-	$(hide) cp -f $(TARGET_OUT_EXECUTABLES)/bin/busybox $(TARGET_RECOVERY_ROOT_OUT)/sbin/
+	$(hide) cp -f $(TARGET_OUT_EXECUTABLES)/busybox $(TARGET_RECOVERY_ROOT_OUT)/sbin/
 	$(hide) cp $(RECOVERY_INSTALL_OTA_KEYS) $(TARGET_RECOVERY_ROOT_OUT)/res/keys
 	$(hide) cat $(INSTALLED_DEFAULT_PROP_TARGET) $(recovery_build_prop) \
 	        > $(TARGET_RECOVERY_ROOT_OUT)/default.prop

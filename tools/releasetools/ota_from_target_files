@@ -100,6 +100,7 @@ import zipfile
 from hashlib import sha1 as sha1
 
 import common
+import fnmatch
 import edify_generator
 import build_image
 import blockimgdiff
@@ -540,15 +541,15 @@ def WriteFullOTAPackage(input_zip, output_zip):
   # Two-step package strategy (in chronological order, which is *not*
   # the order in which the generated script has things):
   #
-  # if stage is not "2/3" or "3/3":
+  # if stage is not "2/3" or "3/3": (1st stage)
   #    write recovery image to boot partition
   #    set stage to "2/3"
   #    reboot to boot partition and restart recovery
-  # else if stage is "2/3":
+  # else if stage is "2/3": (2nd stage)
   #    write recovery image to recovery partition
   #    set stage to "3/3"
   #    reboot to recovery partition and restart recovery
-  # else:
+  # else: (3rd and final stage)
   #    (stage must be "3/3")
   #    set stage to ""
   #    do normal full package installation:
@@ -556,8 +557,8 @@ def WriteFullOTAPackage(input_zip, output_zip):
   #       set up system to update recovery partition on first boot
   #    complete script normally (allow recovery to mark itself finished and reboot)
 
-  recovery_img = common.GetBootableImage("recovery.img", "recovery.img",
-                                         OPTIONS.input_tmp, "RECOVERY")
+  #recovery_img = common.GetBootableImage("recovery.img", "recovery.img",
+  #                                       OPTIONS.input_tmp, "RECOVERY")
   if OPTIONS.two_step:
     if not OPTIONS.info_dict.get("multistage_support", None):
       assert False, "two-step packages not supported by this build"
@@ -565,11 +566,17 @@ def WriteFullOTAPackage(input_zip, output_zip):
     assert fs.fs_type.upper() == "EMMC", \
         "two-step packages only supported on devices with EMMC /misc partitions"
     bcb_dev = {"bcb_dev": fs.device}
-    common.ZipWriteStr(output_zip, "recovery.img", recovery_img.data)
+    #common.ZipWriteStr(output_zip, "recovery.img", recovery_img.data)
     script.AppendExtra("""
 if get_stage("%(bcb_dev)s") == "2/3" then
 """ % bcb_dev)
-    script.WriteRawImage("/recovery", "recovery.img")
+    # stage2of3 - we are booted to boot (which is recovery) update recovery
+    #script.WriteRawImage("/recovery", "recovery.img")
+    # Install recovery to recovery partition
+    script.FormatPartition("/recovery")
+    script.Mount("/recovery")
+    script.UnpackPackageDir("RECOVERY", "/recovery")
+    # reboot to recovery in stage 3
     script.AppendExtra("""
 set_stage("%(bcb_dev)s", "3/3");
 reboot_now("%(bcb_dev)s", "recovery");
@@ -612,16 +619,16 @@ else if get_stage("%(bcb_dev)s") == "3/3" then
     symlinks = CopyPartitionFiles(system_items, input_zip, output_zip)
     script.MakeSymlinks(symlinks)
 
-  boot_img = common.GetBootableImage("boot.img", "boot.img",
-                                     OPTIONS.input_tmp, "BOOT")
+  #boot_img = common.GetBootableImage("boot.img", "boot.img",
+  #                                   OPTIONS.input_tmp, "BOOT")
 
   if not block_based:
     def output_sink(fn, data):
       common.ZipWriteStr(output_zip, "recovery/" + fn, data)
       system_items.Get("system/" + fn, dir=False)
 
-    common.MakeRecoveryPatch(OPTIONS.input_tmp, output_sink,
-                             recovery_img, boot_img)
+    #common.MakeRecoveryPatch(OPTIONS.input_tmp, output_sink,
+    #                         recovery_img, boot_img)
 
     system_items.GetMetadata(input_zip)
     script.AppendExtra('if getprop("ro.boot.selinux") == "disabled" then');
@@ -650,13 +657,13 @@ else if get_stage("%(bcb_dev)s") == "3/3" then
       vendor_items.GetMetadata(input_zip)
       vendor_items.Get("vendor").SetPermissions(script)
 
-  common.CheckSize(boot_img.data, "boot.img", OPTIONS.info_dict)
-  common.ZipWriteStr(output_zip, "boot.img", boot_img.data)
+  #common.CheckSize(boot_img.data, "boot.img", OPTIONS.info_dict)
+  #common.ZipWriteStr(output_zip, "boot.img", boot_img.data)
 
   script.ShowProgress(0.05, 5)
-  script.WriteRawImage("/boot", "boot.img")
+  #script.WriteRawImage("/boot", "boot.img")
 
-  script.ShowProgress(0.2, 10)
+  #script.ShowProgress(0.2, 10)
 
   if block_based:
   	device_specific.FullOTA_InstallEnd_Ext4()
@@ -677,7 +684,19 @@ else if get_stage("%(bcb_dev)s") == "3/3" then
 set_stage("%(bcb_dev)s", "");
 """ % bcb_dev)
     script.AppendExtra("else\n")
-    script.WriteRawImage("/boot", "recovery.img")
+    # stage1of3: install recovery to boot and reboot
+    #script.WriteRawImage("/boot", "recovery.img")
+    # copy kernel/dtbs/script to zip
+    for filename in fnmatch.filter(input_zip.namelist(), "RECOVERY/*"):
+      if not fnmatch.fnmatchcase(filename, "RECOVERY/RAMDISK/*"):
+        file = input_zip.read(filename)
+        common.ZipWriteStr(output_zip, filename, file)
+    script.FormatPartition("/boot")
+    script.Mount("/boot")
+    script.UnpackPackageDir("RECOVERY", "/boot/boot")
+    script.Unmount("/boot")
+    # reboot to boot (boot is now recovery and cache is still intact
+    # so we will boot to recovery starting at stage2of3)
     script.AppendExtra("""
 set_stage("%(bcb_dev)s", "2/3");
 reboot_now("%(bcb_dev)s", "");

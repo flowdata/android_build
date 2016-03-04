@@ -847,80 +847,6 @@ ifdef BOARD_KERNEL_PAGESIZE
   INTERNAL_RECOVERYIMAGE_ARGS += --pagesize $(BOARD_KERNEL_PAGESIZE)
 endif
 
-# Keys authorized to sign OTA packages this build will accept.  The
-# build always uses dev-keys for this; release packaging tools will
-# substitute other keys for this one.
-OTA_PUBLIC_KEYS := $(DEFAULT_SYSTEM_DEV_CERTIFICATE).x509.pem
-
-# Generate a file containing the keys that will be read by the
-# recovery binary.
-RECOVERY_INSTALL_OTA_KEYS := \
-	$(call intermediates-dir-for,PACKAGING,ota_keys)/keys
-DUMPKEY_JAR := $(HOST_OUT_JAVA_LIBRARIES)/dumpkey.jar
-$(RECOVERY_INSTALL_OTA_KEYS): PRIVATE_OTA_PUBLIC_KEYS := $(OTA_PUBLIC_KEYS)
-$(RECOVERY_INSTALL_OTA_KEYS): extra_keys := $(patsubst %,%.x509.pem,$(PRODUCT_EXTRA_RECOVERY_KEYS))
-$(RECOVERY_INSTALL_OTA_KEYS): $(OTA_PUBLIC_KEYS) $(DUMPKEY_JAR) $(extra_keys)
-	@echo "DumpPublicKey: $@ <= $(PRIVATE_OTA_PUBLIC_KEYS) $(extra_keys)"
-	@rm -rf $@
-	@mkdir -p $(dir $@)
-	java -jar $(DUMPKEY_JAR) $(PRIVATE_OTA_PUBLIC_KEYS) $(extra_keys) > $@
-
-$(INSTALLED_RECOVERYIMAGE_TARGET): $(MKBOOTFS) $(MKBOOTIMG) $(MINIGZIP) \
-		$(INSTALLED_RAMDISK_TARGET) \
-		$(INSTALLED_BOOTIMAGE_TARGET) \
-		$(recovery_binary) \
-		$(recovery_initrc) $(recovery_sepolicy) $(recovery_kernel) \
-		$(INSTALLED_2NDBOOTLOADER_TARGET) \
-		$(recovery_build_prop) $(recovery_resource_deps) \
-		$(recovery_fstab) \
-		$(RECOVERY_INSTALL_OTA_KEYS)
-	@echo ----- Making recovery image ------
-	$(hide) rm -rf $(TARGET_RECOVERY_OUT)
-	$(hide) mkdir -p $(TARGET_RECOVERY_OUT)
-	$(hide) mkdir -p $(TARGET_RECOVERY_ROOT_OUT)/etc $(TARGET_RECOVERY_ROOT_OUT)/tmp
-	@echo Copying baseline ramdisk...
-	$(hide) cp -R $(TARGET_ROOT_OUT) $(TARGET_RECOVERY_OUT)
-	@echo Modifying ramdisk contents...
-	$(hide) rm -f $(TARGET_RECOVERY_ROOT_OUT)/init*.rc
-	$(hide) cp -f $(recovery_initrc) $(TARGET_RECOVERY_ROOT_OUT)/
-	$(hide) rm -f $(TARGET_RECOVERY_ROOT_OUT)/sepolicy
-	$(hide) cp -f $(recovery_sepolicy) $(TARGET_RECOVERY_ROOT_OUT)/sepolicy
-	$(hide) -cp $(TARGET_ROOT_OUT)/init.recovery.*.rc $(TARGET_RECOVERY_ROOT_OUT)/
-	$(hide) cp -f $(recovery_binary) $(TARGET_RECOVERY_ROOT_OUT)/sbin/
-	$(hide) mkdir -p $(TARGET_RECOVERY_ROOT_OUT)/res
-	$(hide) rm -rf $(TARGET_RECOVERY_ROOT_OUT)/res/*
-	$(hide) cp -rf $(recovery_resources_common)/* $(TARGET_RECOVERY_ROOT_OUT)/res
-	$(hide) cp -f $(recovery_font) $(TARGET_RECOVERY_ROOT_OUT)/res/images/font.png
-	$(hide) $(foreach item,$(recovery_resources_private), \
-	  cp -rf $(item) $(TARGET_RECOVERY_ROOT_OUT)/)
-	$(hide) $(foreach item,$(recovery_fstab), \
-	  cp -f $(item) $(TARGET_RECOVERY_ROOT_OUT)/etc/recovery.fstab)
-	$(hide) cp $(RECOVERY_INSTALL_OTA_KEYS) $(TARGET_RECOVERY_ROOT_OUT)/res/keys
-	$(hide) cat $(INSTALLED_DEFAULT_PROP_TARGET) $(recovery_build_prop) \
-	        > $(TARGET_RECOVERY_ROOT_OUT)/default.prop
-	$(hide) $(MKBOOTFS) $(TARGET_RECOVERY_ROOT_OUT) | $(MINIGZIP) > $(recovery_ramdisk)
-	for dtsplat in $(TARGET_BOARD_DTS_CONFIG); do \
-		DTS_PLATFORM=`echo $$dtsplat | cut -d':' -f1`; \
-		DTS_BOARD=`echo $$dtsplat | cut -d':' -f2`; \
-		RECOVERY_IMAGE_BOARD=$(patsubst %.img,%-$$DTS_PLATFORM.img,$@); \
-        $(MKBOOTIMG) $(INTERNAL_RECOVERYIMAGE_ARGS) --second $(PRODUCT_OUT)/$$DTS_BOARD $(BOARD_MKBOOTIMG_ARGS) --output $@; \
-        if [ "$(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_SUPPORTS_VERITY)" = true ]; then \
-        $(BOOT_SIGNER) /recovery $@ $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VERITY_SIGNING_KEY).pk8 $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VERITY_SIGNING_KEY).x509.pem $@; \
-        fi;\
-        $(call assert-max-image-size,$@,$(BOARD_RECOVERYIMAGE_PARTITION_SIZE)); \
-        cp -f $@ $$RECOVERY_IMAGE_BOARD; \
-	done
-	@echo ----- Made recovery image: $@ --------
-
-$(RECOVERY_RESOURCE_ZIP): $(INSTALLED_RECOVERYIMAGE_TARGET)
-	$(hide) mkdir -p $(dir $@)
-	$(hide) find $(TARGET_RECOVERY_ROOT_OUT)/res -type f | sort | zip -0qrj $@ -@
-
-else
-INSTALLED_RECOVERYIMAGE_TARGET :=
-RECOVERY_RESOURCE_ZIP :=
-endif
-
 .PHONY: bootloader
 ifneq ($(strip $(TARGET_BOOTLOADER_CONFIG)),)
 BOOTLOADER_CROSS_TOOLCHAIN := `pwd`/prebuilts/gcc/linux-x86/arm/arm-eabi-4.8/bin/arm-eabi-
@@ -961,11 +887,88 @@ TARGET_KERNEL_CONFIGURE := $(PRODUCT_OUT)/.config
 KERNEL_ZIMAGE    := kernel_imx/arch/arm/boot/zImage
 KERNEL_OUT := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ
 
-
 .PHONY: $(TARGET_PREBUILT_KERNEL)
 kernelimage: $(TARGET_PREBUILT_KERNEL)
 
 $(KERNEL_CONFIGURE): kernel_imx/arch/arm/configs/$(TARGET_KERNEL_DEFCONF)
+
+INSTALLED_BOOTSCRIPT_TARGET := $(PRODUCT_OUT)/boot/boot/6x_bootscript-ventana
+INSTALLED_URAMDISK_TARGET := $(PRODUCT_OUT)/boot/boot/uramdisk.img
+INSTALLED_URAMDISK_RECOVERY_TARGET := $(PRODUCT_OUT)/uramdisk-recovery.img
+
+# Keys authorized to sign OTA packages this build will accept.  The
+# build always uses dev-keys for this; release packaging tools will
+# substitute other keys for this one.
+OTA_PUBLIC_KEYS := $(DEFAULT_SYSTEM_DEV_CERTIFICATE).x509.pem
+
+# Generate a file containing the keys that will be read by the
+# recovery binary.
+RECOVERY_INSTALL_OTA_KEYS := \
+	$(call intermediates-dir-for,PACKAGING,ota_keys)/keys
+DUMPKEY_JAR := $(HOST_OUT_JAVA_LIBRARIES)/dumpkey.jar
+$(RECOVERY_INSTALL_OTA_KEYS): PRIVATE_OTA_PUBLIC_KEYS := $(OTA_PUBLIC_KEYS)
+$(RECOVERY_INSTALL_OTA_KEYS): extra_keys := $(patsubst %,%.x509.pem,$(PRODUCT_EXTRA_RECOVERY_KEYS))
+$(RECOVERY_INSTALL_OTA_KEYS): $(OTA_PUBLIC_KEYS) $(DUMPKEY_JAR) $(extra_keys)
+	@echo "DumpPublicKey: $@ <= $(PRIVATE_OTA_PUBLIC_KEYS) $(extra_keys)"
+	@rm -rf $@
+	@mkdir -p $(dir $@)
+	java -jar $(DUMPKEY_JAR) $(PRIVATE_OTA_PUBLIC_KEYS) $(extra_keys) > $@
+
+$(INSTALLED_RECOVERYIMAGE_TARGET): $(MKBOOTFS) $(MKBOOTIMG) $(MINIGZIP) \
+		$(INSTALLED_BOOTSCRIPT_TARGET) \
+		$(TARGET_BOOTLOADER_IMAGE) \
+		$(INSTALLED_URAMDISK_TARGET) \
+		$(INSTALLED_BOOTIMAGE_TARGET) \
+		$(recovery_binary) \
+		$(recovery_initrc) $(recovery_sepolicy) $(recovery_kernel) \
+		$(INSTALLED_2NDBOOTLOADER_TARGET) \
+		$(recovery_build_prop) $(recovery_resource_deps) \
+		$(recovery_fstab) \
+		$(RECOVERY_INSTALL_OTA_KEYS)
+	@echo ----- Making recovery image ------
+	$(hide) rm -rf $(TARGET_RECOVERY_OUT)
+	$(hide) mkdir -p $(TARGET_RECOVERY_OUT)
+	$(hide) mkdir -p $(TARGET_RECOVERY_ROOT_OUT)/etc $(TARGET_RECOVERY_ROOT_OUT)/tmp
+	@echo Copying baseline ramdisk...
+	$(hide) cp -R $(TARGET_ROOT_OUT) $(TARGET_RECOVERY_OUT)
+	@echo Modifying ramdisk contents...
+	$(hide) rm -f $(TARGET_RECOVERY_ROOT_OUT)/init*.rc
+	$(hide) cp -f $(recovery_initrc) $(TARGET_RECOVERY_ROOT_OUT)/
+	$(hide) rm -f $(TARGET_RECOVERY_ROOT_OUT)/sepolicy
+	$(hide) cp -f $(recovery_sepolicy) $(TARGET_RECOVERY_ROOT_OUT)/sepolicy
+	$(hide) -cp $(TARGET_ROOT_OUT)/init.recovery.*.rc $(TARGET_RECOVERY_ROOT_OUT)/
+	$(hide) cp -f $(recovery_binary) $(TARGET_RECOVERY_ROOT_OUT)/sbin/
+	$(hide) mkdir -p $(TARGET_RECOVERY_ROOT_OUT)/res
+	$(hide) rm -rf $(TARGET_RECOVERY_ROOT_OUT)/res/*
+	$(hide) cp -rf $(recovery_resources_common)/* $(TARGET_RECOVERY_ROOT_OUT)/res
+	$(hide) cp -f $(recovery_font) $(TARGET_RECOVERY_ROOT_OUT)/res/images/font.png
+	$(hide) $(foreach item,$(recovery_resources_private), \
+	  cp -rf $(item) $(TARGET_RECOVERY_ROOT_OUT)/)
+	$(hide) $(foreach item,$(recovery_fstab), \
+	  cp -f $(item) $(TARGET_RECOVERY_ROOT_OUT)/etc/$(notdir $(item)); )
+	$(hide) cp $(RECOVERY_INSTALL_OTA_KEYS) $(TARGET_RECOVERY_ROOT_OUT)/res/keys
+	$(hide) cat $(INSTALLED_DEFAULT_PROP_TARGET) $(recovery_build_prop) \
+	        > $(TARGET_RECOVERY_ROOT_OUT)/default.prop
+	$(hide) $(MKBOOTFS) $(TARGET_RECOVERY_ROOT_OUT) | $(MINIGZIP) > $(recovery_ramdisk)
+	$(hide) $(MKBOOTIMG) $(INTERNAL_RECOVERYIMAGE_ARGS) $(BOARD_MKBOOTIMG_ARGS) --output $@
+	$(hide) mkdir -p $(TARGET_RECOVERY_OUT)/boot
+	for dtsplat in $(TARGET_BOARD_DTS_CONFIG); do \
+		DTS_PLATFORM=`echo $$dtsplat | cut -d':' -f1`; \
+		DTS_BOARD=`echo $$dtsplat | cut -d':' -f2`; \
+		cp $(PRODUCT_OUT)/$$DTS_BOARD $(TARGET_RECOVERY_OUT)/boot/$$DTS_BOARD; \
+	done
+	cp $(PRODUCT_OUT)/boot/boot/uImage $(TARGET_RECOVERY_OUT)/boot/
+	cp $(PRODUCT_OUT)/boot/boot/6x_bootscript-ventana $(TARGET_RECOVERY_OUT)/boot/
+	@echo ----- Made recovery image: $@ --------
+
+$(RECOVERY_RESOURCE_ZIP): $(INSTALLED_RECOVERYIMAGE_TARGET)
+	$(hide) mkdir -p $(dir $@)
+	$(hide) find $(TARGET_RECOVERY_ROOT_OUT)/res -type f | sort | zip -0qrj $@ -@
+
+else
+INSTALLED_RECOVERYIMAGE_TARGET :=
+RECOVERY_RESOURCE_ZIP :=
+endif
 
 $(TARGET_KERNEL_CONFIGURE): kernel_imx/arch/arm/configs/$(TARGET_KERNEL_DEFCONF) $(KERNEL_CONFIGURE)
 	$(MAKE) -C kernel_imx $(TARGET_KERNEL_DEFCONF) $(KERNEL_ENV)
@@ -1018,46 +1021,24 @@ endif
 
 # ----------------------------------------------------------------
 # uboot script:
-BOOTSCRIPT_TARGET := $(PRODUCT_OUT)/boot/boot/6x_bootscript-ventana
-$(BOOTSCRIPT_TARGET): device/gateworks/ventana/6x_bootscript.txt $(TARGET_BOOTLOADER_IMAGE)
+$(INSTALLED_BOOTSCRIPT_TARGET): device/gateworks/ventana/6x_bootscript.txt
 	mkdir -p $(dir $@)
 	mkimage -A arm -O linux -T script -C none -a 0 -e 0 -n "boot script" -d $< $@
 
 # ----------------------------------------------------------------
 # uboot images:
-URAMDISK_TARGET := $(PRODUCT_OUT)/boot/boot/uramdisk.img
-$(URAMDISK_TARGET): $(BUILT_RAMDISK_TARGET)
+$(INSTALLED_URAMDISK_TARGET): $(BUILT_RAMDISK_TARGET)
 	mkdir -p $(dir $@)
 	mkimage -A arm -O linux -T ramdisk -n "RAM Disk" -d $< $@
 
-URAMDISK_RECOVERY_TARGET := $(PRODUCT_OUT)/uramdisk-recovery.img
-$(URAMDISK_RECOVERY_TARGET): $(INSTALLED_RECOVERYIMAGE_TARGET)
+$(INSTALLED_URAMDISK_RECOVERY_TARGET): $(INSTALLED_RECOVERYIMAGE_TARGET)
 	mkdir -p $(dir $@)
-	mkimage -A arm -O linux -T ramdisk -n "RAM Disk" -d $< $@
+	mkimage -A arm -O linux -T ramdisk -n "RAM Disk" -d $(recovery_ramdisk) $@
 
 # ----------------------------------------------------------------
 # support ubifs rules:
 .PHONY: ubiimagesgenerate
 ifeq ($(TARGET_USERIMAGES_USE_UBIFS),true)
-BOOT_TARGET_UBIFS := $(PRODUCT_OUT)/boot.ubifs
-$(BOOT_TARGET_UBIFS): $(MKUBIFS) $(INTERNAL_BOOTIMAGE_FILES) $(TARGET_PREBUILT_KERNEL) $(BOOTSCRIPT_TARGET) $(URAMDISK_TARGET)
-	$(MKUBIFS) $(TARGET_MKUBIFS_ARGS) -d $(PRODUCT_OUT)/boot -o $@
-
-RECOVERY_TARGET_UBIFS := $(PRODUCT_OUT)/recovery.ubifs
-$(RECOVERY_TARGET_UBIFS): $(MKUBIFS) $(INSTALLED_RECOVERYIMAGE_TARGET)
-	$(MKUBIFS) $(TARGET_MKUBIFS_ARGS) -d $(PRODUCT_OUT)/recovery -o $@
-
-SYSTEM_TARGET_UBIFS := $(PRODUCT_OUT)/system.ubifs
-$(SYSTEM_TARGET_UBIFS): $(MKUBIFS) $(INSTALLED_SYSTEMIMAGE) $(SELINUX_FC)
-	$(MKUBIFS) $(TARGET_MKUBIFS_ARGS) -S -s $(SELINUX_FC) -d $(PRODUCT_OUT)/system -o $@
-
-USERDATA_TARGET_UBIFS := $(PRODUCT_OUT)/userdata.ubifs
-
-ifneq ($(skip_userdata.img),true)
-$(USERDATA_TARGET_UBIFS): $(MKUBIFS) $(INSTALLED_USERDATAIMAGE_TARGET) $(SELINUX_FC)
-	$(hide) mkdir -p $(PRODUCT_OUT)/data
-	$(MKUBIFS) $(TARGET_MKUBIFS_ARGS) -S -s $(SELINUX_FC) -d $(PRODUCT_OUT)/data -o $@
-endif
 
 UBI_RAW_IMAGE := $(PRODUCT_OUT)/android.ubi
 
@@ -1065,10 +1046,19 @@ UBI_RAW_IMAGE := $(PRODUCT_OUT)/android.ubi
 
 ubiimagesgenerate: $(UBI_RAW_IMAGE)
 
-$(UBI_RAW_IMAGE) : $(BOOT_TARGET_UBIFS) \
-		$(RECOVERY_TARGET_UBIFS) \
-		$(SYSTEM_TARGET_UBIFS) \
-		$(USERDATA_TARGET_UBIFS)
+$(UBI_RAW_IMAGE) : $(INSTALLED_USERDATAIMAGE_TARGET) \
+		$(INSTALLED_BOOTLOADER_TARGET) \
+		$(INSTALLED_URAMDISK_TARGET) \
+		$(INSTALLED_URAMDISK_RECOVERY_TARGET) \
+		$(MKUBIFS) \
+		kernelimage \
+		systemimage
+	$(call pretty,"Generating UBIFS images:")
+	$(MKUBIFS) $(TARGET_MKUBIFS_ARGS) -d $(PRODUCT_OUT)/boot -o $(PRODUCT_OUT)/boot.ubifs
+	$(MKUBIFS) $(TARGET_MKUBIFS_ARGS) -d $(PRODUCT_OUT)/recovery/boot -o $(PRODUCT_OUT)/recovery.ubifs
+	$(MKUBIFS) $(TARGET_MKUBIFS_ARGS) -S -s $(SELINUX_FC) -d $(PRODUCT_OUT)/system -o $(PRODUCT_OUT)/system.ubifs
+	$(hide) mkdir -p $(PRODUCT_OUT)/data
+	$(MKUBIFS) $(TARGET_MKUBIFS_ARGS) -S -s $(SELINUX_FC) -d $(PRODUCT_OUT)/data -o $(PRODUCT_OUT)/userdata.ubifs
 	$(call pretty,"Generating UBI raw image:" "$(UBI_RAW_IMAGE)" "$(UBI_RAW_RECO_IMAGE)")
 	$(MKUBIRAW) -o $(UBI_RAW_IMAGE) $(TARGET_UBIRAW_ARGS)
 else
@@ -1191,10 +1181,7 @@ $(INSTALLED_SYSTEMIMAGE): $(BUILT_SYSTEMIMAGE) $(RECOVERY_FROM_BOOT_PATCH) | $(A
 	$(copy-file-to-target)
 	$(hide) $(call assert-max-image-size,$@ $(RECOVERY_FROM_BOOT_PATCH),$(BOARD_SYSTEMIMAGE_PARTITION_SIZE))
 
-systemimage: $(INSTALLED_SYSTEMIMAGE) \
-	$(BOOTSCRIPT_TARGET) \
-	$(URAMDISK_TARGET) \
-	$(URAMDISK_RECOVERY_TARGET)
+systemimage: $(INSTALLED_SYSTEMIMAGE)
 
 .PHONY: systemimage-nodeps snod
 systemimage-nodeps snod: $(filter-out systemimage-nodeps snod,$(MAKECMDGOALS)) \
@@ -1518,6 +1505,9 @@ endif
 # Depending on the various images guarantees that the underlying
 # directories are up-to-date.
 $(BUILT_TARGET_FILES_PACKAGE): \
+		$(INSTALLED_BOOTSCRIPT_TARGET) \
+		$(INSTALLED_URAMDISK_TARGET) \
+		$(INSTALLED_URAMDISK_RECOVERY_TARGET) \
 		$(INSTALLED_BOOTIMAGE_TARGET) \
 		$(INSTALLED_RADIOIMAGE_TARGET) \
 		$(INSTALLED_RECOVERYIMAGE_TARGET) \
@@ -1536,50 +1526,21 @@ $(BUILT_TARGET_FILES_PACKAGE): \
 	$(hide) mkdir -p $(dir $@) $(zip_root)
 	@# Components of the recovery image
 	$(hide) mkdir -p $(zip_root)/RECOVERY
+	$(ACP) $(INSTALLED_BOOTSCRIPT_TARGET) $(zip_root)/RECOVERY
+	$(ACP) $(INSTALLED_URAMDISK_RECOVERY_TARGET) $(zip_root)/RECOVERY/uramdisk.img
+	$(ACP) $(PRODUCT_OUT)/boot/boot/uImage $(zip_root)/RECOVERY
+	$(ACP) -r $(PRODUCT_OUT)/boot/boot/*.dtb $(zip_root)/RECOVERY
 	$(hide) $(call package_files-copy-root, \
 		$(TARGET_RECOVERY_ROOT_OUT),$(zip_root)/RECOVERY/RAMDISK)
-ifdef INSTALLED_KERNEL_TARGET
-	$(hide) $(ACP) $(INSTALLED_KERNEL_TARGET) $(zip_root)/RECOVERY/kernel
-endif
-ifdef INSTALLED_2NDBOOTLOADER_TARGET
-	$(hide) $(ACP) \
-		$(INSTALLED_2NDBOOTLOADER_TARGET) $(zip_root)/RECOVERY/second
-endif
-ifdef BOARD_KERNEL_CMDLINE
-	$(hide) echo "$(BOARD_KERNEL_CMDLINE)" > $(zip_root)/RECOVERY/cmdline
-endif
-ifdef BOARD_KERNEL_BASE
-	$(hide) echo "$(BOARD_KERNEL_BASE)" > $(zip_root)/RECOVERY/base
-endif
-ifdef BOARD_KERNEL_PAGESIZE
-	$(hide) echo "$(BOARD_KERNEL_PAGESIZE)" > $(zip_root)/RECOVERY/pagesize
-endif
-ifdef BOARD_KERNEL_DTS
-	$(hide) echo "$(BOARD_KERNEL_DTS)" > $(zip_root)/RECOVERY/dtb
-endif
+	@# Components of bootloader
+	$(hide) mkdir -p $(zip_root)/BOOTLOADER
+	$(ACP) -r $(PRODUCT_OUT)/u-boot.img $(zip_root)/BOOTLOADER
+	$(ACP) -r $(PRODUCT_OUT)/SPL $(zip_root)/BOOTLOADER
 	@# Components of the boot image
 	$(hide) mkdir -p $(zip_root)/BOOT
+	$(ACP) -r $(PRODUCT_OUT)/boot/boot $(zip_root)/BOOT
 	$(hide) $(call package_files-copy-root, \
 		$(TARGET_ROOT_OUT),$(zip_root)/BOOT/RAMDISK)
-ifdef INSTALLED_KERNEL_TARGET
-	$(hide) $(ACP) $(INSTALLED_KERNEL_TARGET) $(zip_root)/BOOT/kernel
-endif
-ifdef INSTALLED_2NDBOOTLOADER_TARGET
-	$(hide) $(ACP) \
-		$(INSTALLED_2NDBOOTLOADER_TARGET) $(zip_root)/BOOT/second
-endif
-ifdef BOARD_KERNEL_CMDLINE
-	$(hide) echo "$(BOARD_KERNEL_CMDLINE)" > $(zip_root)/BOOT/cmdline
-endif
-ifdef BOARD_KERNEL_BASE
-	$(hide) echo "$(BOARD_KERNEL_BASE)" > $(zip_root)/BOOT/base
-endif
-ifdef BOARD_KERNEL_PAGESIZE
-	$(hide) echo "$(BOARD_KERNEL_PAGESIZE)" > $(zip_root)/BOOT/pagesize
-endif
-ifdef BOARD_KERNEL_DTS
-	$(hide) echo "$(BOARD_KERNEL_DTS)" > $(zip_root)/BOOT/dtb
-endif
 ifdef DTS_PLATFORM
 	$(hide) mkdir -p $(zip_root)/RADIO;	
 	$(hide) $(ACP) $(PRODUCT_OUT)/u-boot-$(DTS_PLATFORM).imx $(zip_root)/RADIO/bootloader.img
@@ -1635,6 +1596,7 @@ endif
 	$(hide) echo "use_set_metadata=1" >> $(zip_root)/META/misc_info.txt
 	$(hide) echo "multistage_support=1" >> $(zip_root)/META/misc_info.txt
 	$(hide) echo "update_rename_support=1" >> $(zip_root)/META/misc_info.txt
+	$(hide) echo "bcb_device=/system" >> $(zip_root)/META/misc_info.txt
 	$(hide) echo "blockimgdiff_versions=1,2" >> $(zip_root)/META/misc_info.txt
 ifneq ($(OEM_THUMBPRINT_PROPERTIES),)
 	# OTA scripts are only interested in fingerprint related properties
@@ -1688,6 +1650,7 @@ $(INTERNAL_OTA_PACKAGE_TARGET): $(BUILT_TARGET_FILES_PACKAGE) $(DISTTOOLS)
 	$(hide) MKBOOTIMG=$(MKBOOTIMG) \
 	   ./build/tools/releasetools/ota_from_target_files -v \
 	   $(block_file)  \
+	   --two_step \
 	   -p $(HOST_OUT) \
 	   -k $(KEY_CERT_PAIR) \
 	   $(if $(OEM_OTA_CONFIG), -o $(OEM_OTA_CONFIG)) \

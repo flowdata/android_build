@@ -906,6 +906,9 @@ droidcore: kernelimage \
 	$(INSTALLED_CACHEIMAGE_TARGET) \
 	$(INSTALLED_VENDORIMAGE_TARGET) \
 	$(INSTALLED_FILES_FILE) \
+	$(INSTALLED_URAMDISK_TARGET) \
+	$(INSTALLED_URAMDISK_RECOVERY_TARGET) \
+	$(INSTALLED_BOOTSCRIPT_TARGET) \
 	ubiimagesgenerate
 
 # dist_files only for putting your library into the dist directory with a full build.

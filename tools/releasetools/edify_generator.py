@@ -171,19 +171,8 @@ class EdifyGenerator(object):
       where option is optname[=optvalue]
       E.g. ext4=barrier=1,nodelalloc,errors=panic|f2fs=errors=recover
     """
-    fstab = self.info.get("fstab", None)
-    if fstab:
-      p = fstab[mount_point]
-      mount_dict = {}
-      if mount_options_by_format is not None:
-        for option in mount_options_by_format.split("|"):
-          if "=" in option:
-            key, value = option.split("=", 1)
-            mount_dict[key] = value
-      self.script.append('mount("%s", "%s", "%s", "%s", "%s");' %
-                         (p.fs_type, common.PARTITION_TYPES[p.fs_type],
-                          p.device, p.mount_point, mount_dict.get(p.fs_type, "")))
-      self.mounts.add(p.mount_point)
+    self.script.append('mount("%s");' % mount_point)
+    self.mounts.add(mount_point)
 
   def UnpackPackageDir(self, src, dst):
     """Unpack a given directory from the OTA package into the given
@@ -216,13 +205,7 @@ class EdifyGenerator(object):
     """Format the given partition, specified by its mount point (eg,
     "/system")."""
 
-    reserve_size = 0
-    fstab = self.info.get("fstab", None)
-    if fstab:
-      p = fstab[partition]
-      self.script.append('format("%s", "%s", "%s", "%s", "%s");' %
-                         (p.fs_type, common.PARTITION_TYPES[p.fs_type],
-                          p.device, p.length, p.mount_point))
+    self.script.append('format("%s");' % partition)
 
   def WipeBlockDevice(self, partition):
     if partition not in ("/system", "/vendor"):

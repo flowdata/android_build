@@ -562,10 +562,7 @@ def WriteFullOTAPackage(input_zip, output_zip):
   if OPTIONS.two_step:
     if not OPTIONS.info_dict.get("multistage_support", None):
       assert False, "two-step packages not supported by this build"
-    fs = OPTIONS.info_dict["fstab"]["/misc"]
-    assert fs.fs_type.upper() == "EMMC", \
-        "two-step packages only supported on devices with EMMC /misc partitions"
-    bcb_dev = {"bcb_dev": fs.device}
+    bcb_dev = {"bcb_dev": OPTIONS.info_dict.get("bcb_device")}
     #common.ZipWriteStr(output_zip, "recovery.img", recovery_img.data)
     script.AppendExtra("""
 if get_stage("%(bcb_dev)s") == "2/3" then
@@ -850,10 +847,7 @@ def WriteBlockIncrementalOTAPackage(target_zip, source_zip, output_zip):
   if OPTIONS.two_step:
     if not OPTIONS.info_dict.get("multistage_support", None):
       assert False, "two-step packages not supported by this build"
-    fs = OPTIONS.info_dict["fstab"]["/misc"]
-    assert fs.fs_type.upper() == "EMMC", \
-        "two-step packages only supported on devices with EMMC /misc partitions"
-    bcb_dev = {"bcb_dev": fs.device}
+    bcb_dev = {"bcb_dev": OPTIONS.info_dict.get("bcb_device")}
     common.ZipWriteStr(output_zip, "recovery.img", target_recovery.data)
     script.AppendExtra("""
 if get_stage("%(bcb_dev)s") == "2/3" then
@@ -1211,10 +1205,7 @@ def WriteIncrementalOTAPackage(target_zip, source_zip, output_zip):
   if OPTIONS.two_step:
     if not OPTIONS.info_dict.get("multistage_support", None):
       assert False, "two-step packages not supported by this build"
-    fs = OPTIONS.info_dict["fstab"]["/misc"]
-    assert fs.fs_type.upper() == "EMMC", \
-        "two-step packages only supported on devices with EMMC /misc partitions"
-    bcb_dev = {"bcb_dev": fs.device}
+    bcb_dev = {"bcb_dev": OPTIONS.info_dict.get("bcb_device")}
     common.ZipWriteStr(output_zip, "recovery.img", target_recovery.data)
     script.AppendExtra("""
 if get_stage("%(bcb_dev)s") == "2/3" then

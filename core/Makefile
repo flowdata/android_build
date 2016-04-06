@@ -1034,6 +1034,7 @@ $(INSTALLED_URAMDISK_TARGET): $(BUILT_RAMDISK_TARGET)
 $(INSTALLED_URAMDISK_RECOVERY_TARGET): $(INSTALLED_RECOVERYIMAGE_TARGET)
 	mkdir -p $(dir $@)
 	mkimage -A arm -O linux -T ramdisk -n "RAM Disk" -d $(recovery_ramdisk) $@
+	cp $@ $(TARGET_RECOVERY_OUT)/boot/
 
 # ----------------------------------------------------------------
 # support ubifs rules:

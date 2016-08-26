@@ -1021,7 +1021,7 @@ endif
 
 # ----------------------------------------------------------------
 # uboot script:
-$(INSTALLED_BOOTSCRIPT_TARGET): device/gateworks/ventana/6x_bootscript.txt
+$(INSTALLED_BOOTSCRIPT_TARGET): device/flowdata/ventana/6x_bootscript.txt
 	mkdir -p $(dir $@)
 	mkimage -A arm -O linux -T script -C none -a 0 -e 0 -n "boot script" -d $< $@
 
